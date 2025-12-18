@@ -1,0 +1,62 @@
+📦 ARCHIVOS A SUBIR A PRODUCCIÓN (cortlink.cc)
+===============================================
+
+✅ ARCHIVOS OBLIGATORIOS:
+-------------------------
+1. app.py                    (Aplicación Flask principal)
+2. passenger_wsgi.py         (Configuración para Passenger/cPanel)
+3. .htaccess                 (Reglas de redirección)
+4. requirements.txt          (Dependencias Python)
+5. index.html                (Página principal)
+6. login.html                (Página de login)
+7. player.html               (Reproductor de video)
+8. script.js                 (JavaScript del frontend)
+9. styles.css                (Estilos CSS)
+10. users.json               (Base de datos de usuarios)
+11. urls_db.json             (Base de datos de URLs - se crea automático si no existe)
+
+📝 NOTAS IMPORTANTES:
+---------------------
+- El archivo .htaccess puede estar oculto, asegúrate de subirlo
+- urls_db.json se creará automáticamente si no existe, pero puedes subirlo vacío: {}
+- users.json ya tiene el usuario configurado
+
+🔒 SEGURIDAD:
+-------------
+- En producción, cambia app.secret_key en app.py por una clave más segura
+- Considera usar variables de entorno para la clave secreta
+
+📂 ESTRUCTURA EN EL SERVIDOR:
+------------------------------
+public_html/
+├── app.py
+├── passenger_wsgi.py
+├── .htaccess
+├── requirements.txt
+├── index.html
+├── login.html
+├── player.html
+├── script.js
+├── styles.css
+├── users.json
+└── urls_db.json
+
+✅ CHECKLIST ANTES DE SUBIR:
+----------------------------
+[ ] Todos los archivos listados arriba están listos
+[ ] app.py tiene la configuración correcta
+[ ] users.json tiene el usuario: makiurls@urls.com
+[ ] .htaccess está incluido
+[ ] passenger_wsgi.py está incluido
+
+🚀 DESPUÉS DE SUBIR:
+--------------------
+1. Configurar Python App en cPanel
+2. Instalar dependencias: pip3 install --user Flask flask-cors
+3. Configurar permisos (755 para scripts, 644 para archivos)
+4. Activar SSL para cortlink.cc
+5. Probar el login y las funcionalidades
+
+¡Buena suerte con el despliegue! 🎉
+
+

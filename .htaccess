@@ -1,0 +1,15 @@
+# cPanel genera automáticamente las directivas de Passenger
+# Solo configuramos seguridad y archivos estáticos
+
+# Permitir acceso a archivos estáticos
+<FilesMatch "\.(html|css|js|json|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$">
+    Order allow,deny
+    Allow from all
+</FilesMatch>
+
+# Configuración de seguridad - bloquear acceso directo a archivos Python
+<FilesMatch "\.(py|pyc|pyo|pyd|log|db|sqlite)$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+

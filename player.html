@@ -1,0 +1,929 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MakiUrls - Reproductor</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .video-container {
+            width: 100%;
+            max-width: 100%;
+            position: relative;
+        }
+
+        .video-wrapper {
+            background: #000;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+            position: relative;
+            width: 100%;
+        }
+
+        .video-element {
+            width: 100%;
+            height: auto;
+            display: block;
+            max-height: 100vh;
+        }
+
+        #googleDriveFrame {
+            width: 100%;
+            height: 100vh;
+            min-height: 600px;
+        }
+
+        .video-placeholder {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: rgba(255, 255, 255, 0.3);
+            z-index: 0;
+            background: #000;
+        }
+
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid rgba(255, 255, 255, 0.1);
+            border-top-color: rgba(255, 255, 255, 0.6);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        .video-placeholder p {
+            margin-top: 1.5rem;
+            font-size: 1rem;
+            color: rgba(255, 255, 255, 0.6);
+            text-align: center;
+            padding: 0 2rem;
+        }
+
+        .error-message {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(239, 68, 68, 0.9);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            max-width: 90%;
+            text-align: center;
+            z-index: 10;
+            display: none;
+        }
+
+        .error-message.show {
+            display: block;
+            animation: slideUp 0.3s ease;
+        }
+
+        /* Selector de idioma */
+        .language-selector {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(10px);
+            padding: 12px 16px;
+            border-radius: 10px;
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+
+        .language-label {
+            color: white;
+            font-size: 0.9rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            white-space: nowrap;
+        }
+
+        .language-select {
+            background: rgba(255, 255, 255, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 6px;
+            padding: 6px 12px;
+            color: white;
+            font-size: 0.9rem;
+            cursor: pointer;
+            min-width: 150px;
+            font-family: inherit;
+            transition: all 0.2s ease;
+        }
+
+        .language-select:hover {
+            background: rgba(255, 255, 255, 0.25);
+            border-color: rgba(255, 255, 255, 0.5);
+        }
+
+        .language-select:focus {
+            outline: none;
+            background: rgba(255, 255, 255, 0.25);
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
+        }
+
+        .language-select option {
+            background: #1e293b;
+            color: white;
+            padding: 8px;
+        }
+
+        .language-hint {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            margin-top: 8px;
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            white-space: nowrap;
+            z-index: 20;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            pointer-events: none;
+        }
+
+        .language-selector:hover .language-hint {
+            display: block;
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateX(-50%) translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(-50%) translateY(0);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="video-container">
+        <div class="video-wrapper">
+            <div class="video-placeholder">
+                <div class="loading-spinner"></div>
+                <p id="placeholder-text">Cargando video...</p>
+            </div>
+            <video 
+                id="videoPlayer" 
+                controls 
+                class="video-element"
+                preload="auto"
+            >
+                Tu navegador no soporta la reproducción de video.
+            </video>
+            <iframe 
+                id="googleDriveFrame" 
+                class="video-element"
+                style="display: none; border: none;"
+                allowfullscreen
+            ></iframe>
+            <div class="error-message" id="errorMessage"></div>
+        </div>
+    </div>
+
+    <script>
+        // Detectar si estamos en producción o desarrollo
+        const API_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+            ? 'http://localhost:5000' 
+            : window.location.origin;
+        const videoPlayer = document.getElementById('videoPlayer');
+        const placeholder = document.querySelector('.video-placeholder');
+        const placeholderText = document.getElementById('placeholder-text');
+        const errorMessage = document.getElementById('errorMessage');
+
+        // Obtener el código corto de la URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const shortCode = urlParams.get('short');
+
+        if (!shortCode) {
+            showError('Código de URL no válido');
+        } else {
+            loadVideoFromShortCode(shortCode);
+        }
+
+        async function loadVideoFromShortCode(shortCode) {
+            try {
+                placeholderText.textContent = 'Conectando con el servidor...';
+                placeholder.style.display = 'flex';
+
+                let response;
+                try {
+                    response = await fetch(`${API_URL}/${shortCode}`, {
+                        headers: {
+                            'Accept': 'application/json',
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                    console.log('Respuesta recibida:', response.status, response.statusText);
+                } catch (fetchError) {
+                    // Error de red - servidor no disponible
+                    console.error('Error de fetch:', fetchError);
+                    throw new Error('SERVIDOR_NO_DISPONIBLE');
+                }
+
+                if (!response.ok) {
+                    if (response.status === 404) {
+                        throw new Error('URL_NO_ENCONTRADA');
+                    } else {
+                        throw new Error(`Error del servidor: ${response.status}`);
+                    }
+                }
+
+                // Verificar que la respuesta sea JSON
+                const contentType = response.headers.get('content-type');
+                if (!contentType || !contentType.includes('application/json')) {
+                    console.error('Respuesta no es JSON:', contentType);
+                    throw new Error('RESPUESTA_NO_JSON');
+                }
+
+                let data;
+                try {
+                    data = await response.json();
+                } catch (jsonError) {
+                    console.error('Error al parsear JSON:', jsonError);
+                    throw new Error('ERROR_PARSEAR_JSON');
+                }
+
+                if (data && data.original_url) {
+                    const originalUrl = data.original_url;
+                    
+                    // Si es una URL de Google Drive, mostrar en iframe
+                    if (originalUrl.includes('drive.google.com') || originalUrl.includes('docs.google.com')) {
+                        loadGoogleDriveVideo(originalUrl);
+                    } else if (isHLS(originalUrl)) {
+                        // Si es HLS, cargar con hls.js
+                        placeholderText.textContent = 'Cargando video HLS...';
+                        await loadHLSVideo(originalUrl);
+                    } else {
+                        // Si no es Google Drive ni HLS, intentar cargar como video MP4 normal
+                        placeholderText.textContent = 'Cargando video...';
+                        await loadVideoWithTimeout(originalUrl);
+                    }
+                } else {
+                    console.error('Datos recibidos:', data);
+                    throw new Error('URL original no encontrada en la respuesta');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                let errorMsg = '';
+                
+                if (error.message === 'SERVIDOR_NO_DISPONIBLE') {
+                    errorMsg = '⚠️ El servidor Flask no está ejecutándose.<br><br>';
+                    errorMsg += 'Para solucionarlo:<br>';
+                    errorMsg += '1. Abre una terminal/PowerShell<br>';
+                    errorMsg += '2. Navega a la carpeta del proyecto<br>';
+                    errorMsg += '3. Ejecuta: <strong>python app.py</strong><br><br>';
+                    errorMsg += 'Luego recarga esta página.';
+                    if (placeholderText) placeholderText.textContent = 'Servidor no disponible';
+                } else if (error.message === 'URL_NO_ENCONTRADA') {
+                    errorMsg = 'La URL acortada no existe o ha expirado. <a href="/" style="color: #60a5fa; text-decoration: underline;">Generar nueva URL</a>';
+                    if (placeholderText) placeholderText.textContent = 'URL no encontrada';
+                } else if (error.message === 'RESPUESTA_NO_JSON' || error.message === 'ERROR_PARSEAR_JSON') {
+                    errorMsg = 'Error en la respuesta del servidor. Recarga la página o <a href="/" style="color: #60a5fa; text-decoration: underline;">vuelve a la página principal</a>.';
+                    if (placeholderText) placeholderText.textContent = 'Error en respuesta';
+                } else if (error.message.includes('servidor')) {
+                    errorMsg = 'Error del servidor. Por favor, intenta recargar la página.';
+                    if (placeholderText) placeholderText.textContent = 'Error del servidor';
+                } else {
+                    errorMsg = 'Error al cargar el video: ' + error.message + '. <a href="/" style="color: #60a5fa; text-decoration: underline;">Volver a la página principal</a>';
+                    if (placeholderText) placeholderText.textContent = 'Error al cargar';
+                }
+                
+                showError(errorMsg);
+            }
+        }
+
+        function loadVideoWithTimeout(videoUrl) {
+            return new Promise((resolve, reject) => {
+                const timeoutDuration = 30000; // 30 segundos (aumentado para videos que tardan más en cargar)
+                let timeoutId;
+                let hasLoaded = false;
+                let hasErrored = false;
+
+                function onVideoLoaded() {
+                    if (hasErrored) return;
+                    hasLoaded = true;
+                    clearTimeout(timeoutId);
+                    if (placeholder) placeholder.style.display = 'none';
+                    if (placeholderText) placeholderText.textContent = 'El video aparecerá aquí';
+                    
+                    // Detección de pistas de audio deshabilitada
+                    
+                    videoPlayer.removeEventListener('error', handleVideoError);
+                    videoPlayer.removeEventListener('loadeddata', onVideoLoaded);
+                    videoPlayer.removeEventListener('canplay', onVideoLoaded);
+                    resolve();
+                }
+
+                // Variable para rastrear si se disparó el evento error
+                let errorEventFired = false;
+                
+                function handleVideoError() {
+                    // Solo marcar que el evento se disparó, pero NO mostrar el error todavía
+                    errorEventFired = true;
+                    console.log('Evento error disparado en player.html, pero esperando a verificar si el video se carga...');
+                    
+                    // Verificar periódicamente si el video se carga después del error
+                    let checkCount = 0;
+                    const checkInterval = setInterval(() => {
+                        checkCount++;
+                        
+                        // Verificar si el video tiene datos o se está cargando
+                        const currentReadyState = videoPlayer.readyState;
+                        const hasVideoData = currentReadyState >= 2; // HAVE_CURRENT_DATA o superior
+                        const canPlay = currentReadyState >= 3; // HAVE_FUTURE_DATA o superior
+                        
+                        // Si el video se cargó o puede reproducirse, cancelar el error
+                        if (hasLoaded || hasVideoData || canPlay) {
+                            console.log('Video se cargó exitosamente a pesar del error inicial. ReadyState:', currentReadyState);
+                            clearInterval(checkInterval);
+                            errorEventFired = false;
+                            
+                            // Si aún no se marcó como cargado, hacerlo ahora
+                            if (!hasLoaded) {
+                                onVideoLoaded();
+                            }
+                            return;
+                        }
+                        
+                        // Después de 5 segundos, verificar si realmente hay un error
+                        if (checkCount >= 5) {
+                            clearInterval(checkInterval);
+                            
+                            // Verificar una última vez si el video se cargó
+                            if (hasLoaded || videoPlayer.readyState >= 2) {
+                                console.log('Video se cargó en el último momento');
+                                return;
+                            }
+                            
+                            // Verificar si realmente hay un error persistente
+                            const error = videoPlayer.error;
+                            if (!error) {
+                                // No hay error real, el video puede estar cargando todavía
+                                console.log('No hay error real, el video puede estar cargando todavía');
+                                return;
+                            }
+                            
+                            // Verificar si el video puede reproducirse a pesar del error
+                            if (videoPlayer.readyState >= 1) {
+                                console.log('Video tiene metadatos, puede que funcione');
+                                // Intentar reproducir para verificar
+                                videoPlayer.play().then(() => {
+                                    console.log('Video se puede reproducir!');
+                                    if (!hasLoaded) {
+                                        onVideoLoaded();
+                                    }
+                                }).catch(() => {
+                                    // Si no se puede reproducir, mostrar el error
+                                    showActualError(error);
+                                });
+                                return;
+                            }
+                            
+                            // Solo mostrar error si realmente no se puede cargar
+                            showActualError(error);
+                        }
+                    }, 1000); // Verificar cada segundo
+                    
+                    // Función auxiliar para mostrar el error real
+                    function showActualError(error) {
+                        if (hasErrored) return;
+                        hasErrored = true;
+                        clearTimeout(timeoutId);
+                        if (placeholder) placeholder.style.display = 'flex';
+                        
+                        let message = 'Error al cargar el video';
+                        let placeholderMsg = 'No se pudo cargar el video';
+                        
+                        if (error) {
+                            switch(error.code) {
+                                case 1: // MEDIA_ERR_ABORTED
+                                    message = 'Carga del video cancelada';
+                                    placeholderMsg = 'Carga cancelada';
+                                    break;
+                                case 2: // MEDIA_ERR_NETWORK
+                                    message = 'Error de conexión de red (Error 500). El servidor del video rechazó la solicitud. La URL puede haber expirado o requerir autenticación.';
+                                    placeholderMsg = 'Error 500 del servidor';
+                                    break;
+                                case 3: // MEDIA_ERR_DECODE
+                                    message = 'Error al decodificar el formato de video';
+                                    placeholderMsg = 'Formato no compatible';
+                                    break;
+                                case 4: // MEDIA_ERR_SRC_NOT_SUPPORTED
+                                    message = 'El servidor del video rechazó la solicitud (Error 500). Posibles causas: la URL expiró, requiere autenticación, o tiene restricciones. Intenta generar una nueva URL acortada desde la página principal.';
+                                    placeholderMsg = 'Servidor rechazó (Error 500)';
+                                    break;
+                                default:
+                                    message = 'Error desconocido al cargar el video. El servidor del video puede estar rechazando la solicitud (Error 500). La URL puede haber expirado.';
+                                    placeholderMsg = 'Error al cargar';
+                            }
+                        } else {
+                            // Si no hay código de error específico, probablemente es un error 500 del servidor
+                            message = 'El servidor del video rechazó la solicitud (Error 500). La URL puede haber expirado o requerir autenticación. Intenta generar una nueva URL acortada.';
+                            placeholderMsg = 'Error 500 del servidor';
+                        }
+                        
+                        if (placeholderText) placeholderText.textContent = placeholderMsg;
+                        showError(message + ' <a href="/" style="color: #60a5fa; text-decoration: underline;">Volver a la página principal</a>');
+                        reject(new Error(message));
+                    }
+                }
+
+                timeoutId = setTimeout(() => {
+                    // Verificar una última vez si el video se cargó antes de mostrar el error
+                    const finalReadyState = videoPlayer.readyState;
+                    const finalBuffered = videoPlayer.buffered.length > 0 ? videoPlayer.buffered.end(0) : 0;
+                    
+                    // Si el video tiene metadatos y buffer, aún puede estar cargando
+                    if (finalReadyState >= 1 && finalBuffered > 0 && !hasLoaded && !hasErrored) {
+                        console.log('Video tiene progreso al final del timeout, dándole más tiempo - readyState:', finalReadyState, 'buffer:', finalBuffered);
+                        // Dar 5 segundos más si hay progreso
+                        setTimeout(() => {
+                            if (!hasLoaded && !hasErrored && videoPlayer.readyState >= 1) {
+                                console.log('Video cargado después de extensión del timeout');
+                                onVideoLoaded();
+                            } else if (!hasLoaded && !hasErrored) {
+                                showTimeoutError();
+                            }
+                        }, 5000);
+                        return;
+                    }
+                    
+                    if (!hasLoaded && !hasErrored) {
+                        showTimeoutError();
+                    }
+                    
+                    function showTimeoutError() {
+                        hasErrored = true;
+                        videoPlayer.pause();
+                        videoPlayer.src = '';
+                        if (placeholder) placeholder.style.display = 'flex';
+                        if (placeholderText) placeholderText.textContent = 'Tiempo de espera agotado';
+                        showError('Tiempo de espera agotado. El video puede requerir autenticación o no estar disponible.');
+                        reject(new Error('Timeout'));
+                    }
+                }, timeoutDuration);
+
+                videoPlayer.addEventListener('error', handleVideoError, { once: true });
+                videoPlayer.addEventListener('loadeddata', onVideoLoaded, { once: true });
+                videoPlayer.addEventListener('canplay', onVideoLoaded, { once: true });
+                videoPlayer.addEventListener('canplaythrough', onVideoLoaded, { once: true });
+                videoPlayer.addEventListener('playing', onVideoLoaded, { once: true });
+                videoPlayer.addEventListener('progress', () => {
+                    const buffered = videoPlayer.buffered.length > 0 ? videoPlayer.buffered.end(0) : 0;
+                    const readyState = videoPlayer.readyState;
+                    
+                    if (buffered > 0 && readyState >= 1 && !hasLoaded && !hasErrored) {
+                        console.log('Video tiene buffer y metadatos en player.html, considerando cargado - readyState:', readyState, 'buffer:', buffered);
+                        onVideoLoaded();
+                    }
+                });
+                
+                // Verificar también cuando se cargan los metadatos
+                videoPlayer.addEventListener('loadedmetadata', () => {
+                    const buffered = videoPlayer.buffered.length > 0 ? videoPlayer.buffered.end(0) : 0;
+                    if (buffered > 0 && !hasLoaded && !hasErrored) {
+                        console.log('Metadatos cargados y hay buffer en player.html, considerando cargado');
+                        onVideoLoaded();
+                    }
+                });
+                videoPlayer.addEventListener('loadstart', () => {
+                    console.log('Video iniciando carga en player.html...');
+                });
+
+                try {
+                    videoPlayer.src = videoUrl;
+                    videoPlayer.load();
+                    
+                    // Verificar periódicamente si el video se carga (incluso si hay un error inicial)
+                    let lastReadyState = -1;
+                    let lastBufferedTime = 0;
+                    const progressCheck = setInterval(() => {
+                        const currentReadyState = videoPlayer.readyState;
+                        const currentBuffered = videoPlayer.buffered.length > 0 ? videoPlayer.buffered.end(0) : 0;
+                        
+                        // Si el readyState cambió o hay buffer, el video está cargando
+                        if (currentReadyState !== lastReadyState || currentBuffered > lastBufferedTime) {
+                            console.log('Video cargando progresivamente en player.html - readyState:', currentReadyState, 'buffer:', currentBuffered);
+                            lastReadyState = currentReadyState;
+                            lastBufferedTime = currentBuffered;
+                        }
+                        
+                        // Si el video tiene metadatos y buffer, considerarlo cargado (más permisivo)
+                        if (currentReadyState >= 1 && currentBuffered > 0 && !hasLoaded && !hasErrored) {
+                            console.log('Video detectado como cargado en player.html (readyState >= 1 con buffer):', currentReadyState);
+                            clearInterval(progressCheck);
+                            onVideoLoaded();
+                            return;
+                        }
+                        
+                        // Si el video tiene datos suficientes para reproducir, considerarlo cargado
+                        if (currentReadyState >= 2 && !hasLoaded && !hasErrored) {
+                            console.log('Video detectado como cargado en player.html (readyState >= 2):', currentReadyState);
+                            clearInterval(progressCheck);
+                            onVideoLoaded();
+                            return;
+                        }
+                        
+                        // Si el video puede reproducirse, considerarlo cargado
+                        if (currentReadyState >= 3 && !hasLoaded && !hasErrored) {
+                            console.log('Video puede reproducirse en player.html (readyState >= 3):', currentReadyState);
+                            clearInterval(progressCheck);
+                            onVideoLoaded();
+                            return;
+                        }
+                        
+                        // Si ya se resolvió o hay error, limpiar
+                        if (hasLoaded || hasErrored) {
+                            clearInterval(progressCheck);
+                        }
+                    }, 200); // Verificar cada 200ms para detectar más rápido
+                    
+                    // Limpiar el intervalo después del timeout
+                    setTimeout(() => {
+                        clearInterval(progressCheck);
+                    }, timeoutDuration);
+                    
+                } catch (error) {
+                    clearTimeout(timeoutId);
+                    handleVideoError();
+                    reject(error);
+                }
+            });
+        }
+
+        function loadGoogleDriveVideo(driveUrl) {
+            // Convertir URL de Google Drive a formato de visualización
+            let embedUrl = driveUrl;
+            
+            // Si es un enlace de visualización, convertirlo a formato de reproducción
+            if (driveUrl.includes('/file/d/')) {
+                const fileId = driveUrl.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+                if (fileId && fileId[1]) {
+                    // Usar el formato de previsualización de Google Drive
+                    embedUrl = `https://drive.google.com/file/d/${fileId[1]}/preview`;
+                }
+            }
+            
+            // Ocultar el video player y mostrar el iframe
+            const languageSelector = document.getElementById('languageSelector');
+            
+            if (videoPlayer) {
+                videoPlayer.style.display = 'none';
+            }
+            if (placeholder) {
+                placeholder.style.display = 'none';
+            }
+            
+            // Ocultar selector de idioma para Google Drive (Google Drive lo maneja automáticamente)
+            if (languageSelector) {
+                languageSelector.style.display = 'none';
+            }
+            
+            const iframe = document.getElementById('googleDriveFrame');
+            if (iframe) {
+                iframe.src = embedUrl;
+                iframe.style.display = 'block';
+            }
+        }
+
+        // Función para detectar y configurar pistas de audio disponibles
+        function detectAudioTracks() {
+            try {
+                const languageSelector = document.getElementById('languageSelector');
+                const audioTrackSelect = document.getElementById('audioTrackSelect');
+                
+                if (!languageSelector || !audioTrackSelect) return;
+                
+                // Limpiar opciones anteriores
+                audioTrackSelect.innerHTML = '';
+                
+                // Verificar si el navegador soporta audioTracks
+                if (videoPlayer.audioTracks && videoPlayer.audioTracks.length > 1) {
+                    console.log(`Video tiene ${videoPlayer.audioTracks.length} pistas de audio disponibles`);
+                    
+                    // Agregar opciones para cada pista detectada
+                    for (let i = 0; i < videoPlayer.audioTracks.length; i++) {
+                        const track = videoPlayer.audioTracks[i];
+                        const option = document.createElement('option');
+                        option.value = i;
+                        const trackName = track.label || track.language || `Idioma ${i + 1}`;
+                        option.textContent = trackName;
+                        if (track.enabled) {
+                            option.selected = true;
+                        }
+                        audioTrackSelect.appendChild(option);
+                    }
+                    
+                    // Mostrar el selector
+                    languageSelector.style.display = 'flex';
+                    
+                    // Configurar evento para cambiar de pista
+                    audioTrackSelect.addEventListener('change', function() {
+                        changeAudioTrack(parseInt(this.value));
+                    });
+                    
+                } else {
+                    // Si no se detectan pistas automáticamente, mostrar opciones comunes y instrucciones
+                    console.log('No se detectaron pistas automáticamente. Mostrando opciones manuales.');
+                    
+                    // Agregar opción con instrucciones
+                    const instructionOption = document.createElement('option');
+                    instructionOption.value = '';
+                    instructionOption.textContent = 'Usa los controles del reproductor';
+                    instructionOption.disabled = true;
+                    audioTrackSelect.appendChild(instructionOption);
+                    
+                    // Agregar opciones comunes de idioma (por si el video las tiene)
+                    const commonLanguages = [
+                        { value: 'es', label: 'Español' },
+                        { value: 'en', label: 'Inglés' },
+                        { value: 'fr', label: 'Francés' },
+                        { value: 'pt', label: 'Portugués' }
+                    ];
+                    
+                    commonLanguages.forEach(lang => {
+                        const option = document.createElement('option');
+                        option.value = lang.value;
+                        option.textContent = lang.label;
+                        audioTrackSelect.appendChild(option);
+                    });
+                    
+                    // Mostrar el selector con instrucciones
+                    languageSelector.style.display = 'flex';
+                    languageSelector.title = 'Si el video tiene múltiples idiomas, usa: Clic derecho → Configuración → Pistas, o el menú de configuración (⚙️) del reproductor';
+                    
+                    // Mostrar hint
+                    const languageHint = document.getElementById('languageHint');
+                    if (languageHint) {
+                        languageHint.style.display = 'block';
+                    }
+                    
+                    // Configurar evento informativo
+                    audioTrackSelect.addEventListener('change', function() {
+                        if (this.value) {
+                            showError('💡 Para cambiar el idioma: Haz clic derecho en el video → "Configuración" → "Pistas", o usa el menú ⚙️ en los controles.');
+                        }
+                    });
+                }
+            } catch (e) {
+                console.error('Error al detectar pistas de audio:', e);
+                // Aún así mostrar el selector con instrucciones
+                const languageSelector = document.getElementById('languageSelector');
+                if (languageSelector) {
+                    languageSelector.style.display = 'flex';
+                }
+            }
+        }
+        
+        // Función para cambiar la pista de audio
+        function changeAudioTrack(trackIndex) {
+            try {
+                if (!videoPlayer.audioTracks || trackIndex < 0 || trackIndex >= videoPlayer.audioTracks.length) {
+                    console.error('Índice de pista inválido');
+                    return;
+                }
+                
+                // Desactivar todas las pistas
+                for (let i = 0; i < videoPlayer.audioTracks.length; i++) {
+                    videoPlayer.audioTracks[i].enabled = false;
+                }
+                
+                // Activar la pista seleccionada
+                videoPlayer.audioTracks[trackIndex].enabled = true;
+                
+                const track = videoPlayer.audioTracks[trackIndex];
+                console.log(`Cambiado a pista ${trackIndex + 1}: ${track.label || track.language || 'Idioma ' + (trackIndex + 1)}`);
+                
+            } catch (e) {
+                console.error('Error al cambiar pista de audio:', e);
+            }
+        }
+
+        // Verificar si es una URL HLS
+        function isHLS(url) {
+            return url.includes('.m3u8') || url.includes('hls') || url.toLowerCase().includes('m3u8');
+        }
+
+        // Cargar video HLS con hls.js
+        async function loadHLSVideo(hlsUrl) {
+            return new Promise((resolve, reject) => {
+                if (placeholderText) {
+                    placeholderText.textContent = 'Cargando video HLS...';
+                }
+                if (placeholder) placeholder.style.display = 'flex';
+                
+                // Limpiar instancia HLS anterior si existe
+                if (hls) {
+                    hls.destroy();
+                    hls = null;
+                }
+                
+                // Verificar si el navegador soporta HLS nativamente
+                if (videoPlayer.canPlayType('application/vnd.apple.mpegurl')) {
+                    // Safari soporta HLS nativamente
+                    videoPlayer.src = hlsUrl;
+                    videoPlayer.load();
+                    
+                    videoPlayer.addEventListener('loadeddata', () => {
+                        if (placeholder) placeholder.style.display = 'none';
+                        resolve();
+                    }, { once: true });
+                    
+                    videoPlayer.addEventListener('error', () => {
+                        reject(new Error('Error al cargar video HLS'));
+                    }, { once: true });
+                } else if (Hls.isSupported()) {
+                    // Usar hls.js para navegadores que no soportan HLS nativamente
+                    hls = new Hls({
+                        enableWorker: true,
+                        lowLatencyMode: false
+                    });
+                    
+                    hls.loadSource(hlsUrl);
+                    hls.attachMedia(videoPlayer);
+                    
+                    hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                        if (placeholder) placeholder.style.display = 'none';
+                        resolve();
+                    });
+                    
+                    hls.on(Hls.Events.ERROR, (event, data) => {
+                        console.error('Error HLS:', data);
+                        if (data.fatal) {
+                            switch(data.type) {
+                                case Hls.ErrorTypes.NETWORK_ERROR:
+                                    reject(new Error('Error de red al cargar HLS'));
+                                    break;
+                                case Hls.ErrorTypes.MEDIA_ERROR:
+                                    reject(new Error('Error de media al cargar HLS'));
+                                    break;
+                                default:
+                                    reject(new Error('Error fatal al cargar HLS'));
+                                    break;
+                            }
+                        }
+                    });
+                } else {
+                    reject(new Error('Tu navegador no soporta HLS. Prueba con Chrome, Firefox o Safari.'));
+                }
+            });
+        }
+
+        // Detectar y configurar pistas de audio HLS
+        function detectHLSAudioTracks() {
+            try {
+                const languageSelector = document.getElementById('languageSelector');
+                const audioTrackSelect = document.getElementById('audioTrackSelect');
+                
+                if (!languageSelector || !audioTrackSelect) return;
+                
+                // Limpiar opciones anteriores
+                audioTrackSelect.innerHTML = '';
+                
+                let audioTracks = [];
+                
+                // Obtener pistas de audio desde hls.js o del video nativo
+                if (hls && hls.audioTracks && hls.audioTracks.length > 0) {
+                    // HLS con hls.js
+                    audioTracks = hls.audioTracks;
+                    console.log(`HLS tiene ${audioTracks.length} pistas de audio disponibles`);
+                    
+                    // Agregar opciones para cada pista
+                    for (let i = 0; i < audioTracks.length; i++) {
+                        const track = audioTracks[i];
+                        const option = document.createElement('option');
+                        option.value = i;
+                        const trackName = track.name || track.lang || `Idioma ${i + 1}`;
+                        option.textContent = trackName;
+                        if (track.default) {
+                            option.selected = true;
+                        }
+                        audioTrackSelect.appendChild(option);
+                    }
+                    
+                    // Mostrar el selector
+                    languageSelector.style.display = 'flex';
+                    
+                    // Configurar evento para cambiar de pista
+                    audioTrackSelect.addEventListener('change', function() {
+                        changeHLSAudioTrack(parseInt(this.value));
+                    });
+                    
+                } else if (videoPlayer.audioTracks && videoPlayer.audioTracks.length > 1) {
+                    // HLS nativo (Safari)
+                    audioTracks = Array.from(videoPlayer.audioTracks);
+                    console.log(`HLS nativo tiene ${audioTracks.length} pistas de audio disponibles`);
+                    
+                    // Agregar opciones para cada pista
+                    for (let i = 0; i < audioTracks.length; i++) {
+                        const track = audioTracks[i];
+                        const option = document.createElement('option');
+                        option.value = i;
+                        const trackName = track.label || track.language || `Idioma ${i + 1}`;
+                        option.textContent = trackName;
+                        if (track.enabled) {
+                            option.selected = true;
+                        }
+                        audioTrackSelect.appendChild(option);
+                    }
+                    
+                    // Mostrar el selector
+                    languageSelector.style.display = 'flex';
+                    
+                    // Configurar evento para cambiar de pista
+                    audioTrackSelect.addEventListener('change', function() {
+                        changeAudioTrack(parseInt(this.value));
+                    });
+                } else {
+                    // No se detectaron pistas, pero mostrar selector con mensaje
+                    const instructionOption = document.createElement('option');
+                    instructionOption.value = '';
+                    instructionOption.textContent = 'Cargando pistas...';
+                    instructionOption.disabled = true;
+                    audioTrackSelect.appendChild(instructionOption);
+                    
+                    languageSelector.style.display = 'flex';
+                }
+            } catch (e) {
+                console.error('Error al detectar pistas HLS:', e);
+            }
+        }
+
+        // Cambiar pista de audio HLS
+        function changeHLSAudioTrack(trackIndex) {
+            try {
+                if (!hls || !hls.audioTracks || trackIndex < 0 || trackIndex >= hls.audioTracks.length) {
+                    console.error('Índice de pista HLS inválido');
+                    return;
+                }
+                
+                // Cambiar la pista de audio en HLS
+                hls.audioTrack = trackIndex;
+                
+                const track = hls.audioTracks[trackIndex];
+                console.log(`Cambiado a pista HLS ${trackIndex + 1}: ${track.name || track.lang || 'Idioma ' + (trackIndex + 1)}`);
+                
+                showError(`Idioma cambiado a: ${track.name || track.lang || 'Idioma ' + (trackIndex + 1)}`);
+                
+            } catch (e) {
+                console.error('Error al cambiar pista HLS:', e);
+                showError('Error al cambiar el idioma HLS');
+            }
+        }
+
+        function showError(message) {
+            errorMessage.innerHTML = message;
+            errorMessage.classList.add('show');
+            
+            setTimeout(() => {
+                errorMessage.classList.remove('show');
+            }, 8000);
+        }
+    </script>
+</body>
+</html>
+
