@@ -162,6 +162,8 @@ def index():
 # Ruta para servir archivos estáticos (CSS, JS)
 @app.route('/<path:filename>')
 def serve_static(filename):
+    # Debug: siempre imprimir cuando se llama esta función
+    print(f"[DEBUG] serve_static llamado con filename: '{filename}'")
     # Permitir acceso a login.html sin autenticación
     if filename == 'login.html':
         return send_from_directory('.', filename)
@@ -343,6 +345,75 @@ def clear_all_urls():
         
     except Exception as e:
         return jsonify({'error': f'Error del servidor: {str(e)}'}), 500
+
+# Manejador de errores 404 - capturar todas las rutas no encontradas
+@app.errorhandler(404)
+def not_found(error):
+    # Obtener la ruta solicitada
+    path = request.path.lstrip('/')
+    print(f"[DEBUG] Error 404 capturado para ruta: '{path}'")
+    
+    # Si es un código corto (no es un archivo estático conocido), verificar en BD
+    if not path.endswith(('.css', '.js', '.html', '.ico', '.png', '.jpg', '.jpeg', '.gif', '.svg')):
+        db = load_db()
+        print(f"[DEBUG] Verificando si '{path}' existe en BD (tiene {len(db)} entradas)")
+        if path in db:
+            print(f"[DEBUG] ✅ Encontrado en BD! Redirigiendo a player.html")
+            original_url = db[path]['original_url']
+            
+            # Incrementar clicks
+            if 'clicks' not in db[path]:
+                db[path]['clicks'] = 0
+            db[path]['clicks'] += 1
+            save_db(db)
+            
+            # Redirigir a player.html
+            return redirect(f'/player.html?short={path}', code=302)
+        else:
+            print(f"[DEBUG] ❌ No encontrado en BD. Códigos disponibles: {list(db.keys())[:10]}")
+    
+    # Si no es un código corto válido, devolver página de error 404
+    return '''
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>URL no encontrada - MakiUrls</title>
+        <meta charset="utf-8">
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                height: 100vh;
+                margin: 0;
+            }
+            .container {
+                text-align: center;
+                background: rgba(0,0,0,0.3);
+                padding: 40px;
+                border-radius: 10px;
+            }
+            h1 { font-size: 48px; margin: 0; }
+            p { font-size: 18px; margin: 20px 0; }
+            a {
+                color: #fff;
+                text-decoration: underline;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>404</h1>
+            <p>URL acortada no encontrada</p>
+            <p>El enlace que buscas no existe o ha sido eliminado.</p>
+            <p><a href="/">Volver al inicio</a></p>
+        </div>
+    </body>
+    </html>
+    ''', 404
 
 if __name__ == '__main__':
     # Configuración para desarrollo
