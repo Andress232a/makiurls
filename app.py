@@ -127,6 +127,14 @@ def shorten_url():
             'clicks': 0
         }
         save_db(db)
+        # Debug: verificar que se guardó
+        print(f"[DEBUG] URL guardada: {short_code} -> {original_url}")
+        # Verificar que se guardó correctamente
+        db_verify = load_db()
+        if short_code in db_verify:
+            print(f"[DEBUG] ✅ Verificación: {short_code} existe en BD")
+        else:
+            print(f"[DEBUG] ❌ ERROR: {short_code} NO existe en BD después de guardar!")
         
         return jsonify({
             'short_code': short_code,
@@ -175,6 +183,10 @@ def serve_static(filename):
     # Si no es un archivo estático, tratar como código corto
     # Verificar primero si existe en la base de datos
     db = load_db()
+    # Debug: imprimir en logs
+    print(f"[DEBUG] Buscando código corto: {filename}")
+    print(f"[DEBUG] Base de datos tiene {len(db)} entradas")
+    print(f"[DEBUG] Códigos disponibles: {list(db.keys())[:10]}")  # Primeros 10
     if filename in db:
         original_url = db[filename]['original_url']
         
