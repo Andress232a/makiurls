@@ -358,7 +358,7 @@ def not_found(error):
         db = load_db()
         print(f"[DEBUG] Verificando si '{path}' existe en BD (tiene {len(db)} entradas)")
         if path in db:
-            print(f"[DEBUG] ✅ Encontrado en BD! Redirigiendo a player.html")
+            print(f"[DEBUG] ✅ Encontrado en BD!")
             original_url = db[path]['original_url']
             
             # Incrementar clicks
@@ -367,12 +367,30 @@ def not_found(error):
             db[path]['clicks'] += 1
             save_db(db)
             
-            # Redirigir a player.html
+            # Si es una petición AJAX (con Accept: application/json), devolver JSON
+            accept_header = request.headers.get('Accept', '')
+            if 'application/json' in accept_header or request.is_json:
+                print(f"[DEBUG] Petición AJAX detectada, devolviendo JSON")
+                return jsonify({
+                    'original_url': original_url,
+                    'short_code': path
+                }), 200
+            
+            # Si no es AJAX, redirigir a player.html
+            print(f"[DEBUG] Petición normal, redirigiendo a player.html")
             return redirect(f'/player.html?short={path}', code=302)
         else:
             print(f"[DEBUG] ❌ No encontrado en BD. Códigos disponibles: {list(db.keys())[:10]}")
+            # Si es una petición AJAX, devolver JSON de error
+            accept_header = request.headers.get('Accept', '')
+            if 'application/json' in accept_header or request.is_json:
+                return jsonify({'error': 'URL acortada no encontrada'}), 404
     
     # Si no es un código corto válido, devolver página de error 404
+    # Verificar si es petición AJAX
+    accept_header = request.headers.get('Accept', '')
+    if 'application/json' in accept_header or request.is_json:
+        return jsonify({'error': 'URL no encontrada'}), 404
     return '''
     <!DOCTYPE html>
     <html>
