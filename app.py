@@ -206,7 +206,48 @@ def serve_static(filename):
         # Si no se encuentra, devolver error
         if 'application/json' in request.headers.get('Accept', ''):
             return jsonify({'error': 'URL acortada no encontrada'}), 404
-        return jsonify({'error': 'URL acortada no encontrada'}), 404
+        # Devolver página HTML de error 404
+        return '''
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>URL no encontrada - MakiUrls</title>
+            <meta charset="utf-8">
+            <style>
+                body {
+                    font-family: Arial, sans-serif;
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    color: white;
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    height: 100vh;
+                    margin: 0;
+                }
+                .container {
+                    text-align: center;
+                    background: rgba(0,0,0,0.3);
+                    padding: 40px;
+                    border-radius: 10px;
+                }
+                h1 { font-size: 48px; margin: 0; }
+                p { font-size: 18px; margin: 20px 0; }
+                a {
+                    color: #fff;
+                    text-decoration: underline;
+                }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h1>404</h1>
+                <p>URL acortada no encontrada</p>
+                <p>El enlace que buscas no existe o ha sido eliminado.</p>
+                <p><a href="/">Volver al inicio</a></p>
+            </div>
+        </body>
+        </html>
+        ''', 404
 
 # Ruta para obtener estadísticas de todas las URLs
 @app.route('/api/stats', methods=['GET'])
