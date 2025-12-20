@@ -104,6 +104,7 @@ def shorten_url():
     try:
         data = request.get_json()
         original_url = data.get('url', '').strip()
+        url_name = data.get('name', '').strip()  # Nombre opcional
         
         if not original_url:
             return jsonify({'error': 'URL no proporcionada'}), 400
@@ -123,6 +124,7 @@ def shorten_url():
         # Guardar en la base de datos
         db[short_code] = {
             'original_url': original_url,
+            'name': url_name if url_name else '',  # Nombre opcional, vacío si no se proporciona
             'created_at': datetime.now().isoformat(),
             'clicks': 0
         }
@@ -291,6 +293,7 @@ def get_stats():
                 'short_code': short_code,
                 'short_url': f'{request.host_url}{short_code}',
                 'original_url': data.get('original_url', ''),
+                'name': data.get('name', ''),  # Nombre de la URL
                 'clicks': data.get('clicks', 0),
                 'created_at': created_at
             })

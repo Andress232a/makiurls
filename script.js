@@ -83,12 +83,18 @@ async function shortenAndPlay(originalUrl, isGoogleDrive = false) {
 
     try {
         // Paso 1: Acortar la URL
+        const urlNameInput = document.getElementById('urlName');
+        const urlName = urlNameInput ? urlNameInput.value.trim() : '';
+        
         const response = await fetch(`${API_URL}/shorten`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ url: originalUrl })
+            body: JSON.stringify({ 
+                url: originalUrl,
+                name: urlName  // Incluir el nombre si se proporcionó
+            })
         });
 
         const data = await response.json();
@@ -1074,7 +1080,7 @@ async function loadStats() {
         statsSection.style.display = 'block';
         
         // Mostrar loading
-        statsTableBody.innerHTML = '<tr><td colspan="5" class="loading-row">Cargando estadísticas...</td></tr>';
+        statsTableBody.innerHTML = '<tr><td colspan="6" class="loading-row">Cargando estadísticas...</td></tr>';
         
         // Hacer petición a la API
         const response = await fetch(`${API_URL}/api/stats`);
@@ -1126,7 +1132,7 @@ async function loadStats() {
         
     } catch (error) {
         console.error('Error al cargar estadísticas:', error);
-        statsTableBody.innerHTML = '<tr><td colspan="5" class="loading-row" style="color: var(--error-red);">Error al cargar estadísticas. Intenta recargar la página.</td></tr>';
+        statsTableBody.innerHTML = '<tr><td colspan="6" class="loading-row" style="color: var(--error-red);">Error al cargar estadísticas. Intenta recargar la página.</td></tr>';
     }
 }
 
@@ -1134,7 +1140,7 @@ async function loadStats() {
 function filterStatsByDate(filter) {
     if (!allStatsData || allStatsData.length === 0) {
         if (statsTableBody) {
-            statsTableBody.innerHTML = '<tr><td colspan="5" class="loading-row">No hay datos para filtrar</td></tr>';
+            statsTableBody.innerHTML = '<tr><td colspan="6" class="loading-row">No hay datos para filtrar</td></tr>';
         }
         return;
     }
@@ -1184,7 +1190,7 @@ function filterStatsByDate(filter) {
     statsTableBody.innerHTML = '';
     
     if (filteredStats.length === 0) {
-        statsTableBody.innerHTML = '<tr><td colspan="5" class="loading-row">No hay URLs en este período</td></tr>';
+        statsTableBody.innerHTML = '<tr><td colspan="6" class="loading-row">No hay URLs en este período</td></tr>';
         return;
     }
     
@@ -1215,7 +1221,11 @@ function filterStatsByDate(filter) {
             originalUrlDisplay = originalUrlDisplay.substring(0, 50) + '...';
         }
         
+        // Mostrar nombre o "Sin nombre" si está vacío
+        const displayName = stat.name && stat.name.trim() ? stat.name.trim() : '<span style="color: #888; font-style: italic;">Sin nombre</span>';
+        
         row.innerHTML = `
+            <td class="url-name">${displayName}</td>
             <td>
                 <a href="${stat.short_url}" target="_blank" class="url-short">
                     ${stat.short_url}

@@ -838,6 +838,15 @@ body {
     padding: 2rem !important;
 }
 
+.stats-table .url-name {
+    font-weight: 600;
+    color: var(--text-primary);
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 .stats-table .url-short {
     font-family: 'Courier New', monospace;
     color: var(--primary-blue);
