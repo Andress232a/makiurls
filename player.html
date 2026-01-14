@@ -296,11 +296,23 @@
                     } else if (isHLS(originalUrl)) {
                         // Si es HLS, cargar con hls.js
                         placeholderText.textContent = 'Cargando video HLS...';
-                        await loadHLSVideo(originalUrl);
+                        try {
+                            await loadHLSVideo(originalUrl);
+                        } catch (error) {
+                            // Si HLS falla, cargar en iframe como respaldo
+                            console.log('HLS falló, cargando en iframe:', error);
+                            loadUrlInIframe(originalUrl);
+                        }
                     } else {
-                        // Si no es Google Drive ni HLS, intentar cargar como video MP4 normal
+                        // Intentar cargar como video MP4 normal primero
                         placeholderText.textContent = 'Cargando video...';
-                        await loadVideoWithTimeout(originalUrl);
+                        try {
+                            await loadVideoWithTimeout(originalUrl);
+                        } catch (error) {
+                            // Si falla, cargar directamente en iframe (para URLs raras o que no se reconocen)
+                            console.log('Video no pudo cargarse como MP4, cargando en iframe:', error);
+                            loadUrlInIframe(originalUrl);
+                        }
                     }
                 } else {
                     console.error('Datos recibidos:', data);
@@ -338,7 +350,7 @@
 
         function loadVideoWithTimeout(videoUrl) {
             return new Promise((resolve, reject) => {
-                const timeoutDuration = 30000; // 30 segundos (aumentado para videos que tardan más en cargar)
+                const timeoutDuration = 2000; // 2 segundos - si no carga, mostrar iframe
                 let timeoutId;
                 let hasLoaded = false;
                 let hasErrored = false;
@@ -389,8 +401,8 @@
                             return;
                         }
                         
-                        // Después de 5 segundos, verificar si realmente hay un error
-                        if (checkCount >= 5) {
+                        // Después de 2 segundos, si no carga, mostrar iframe
+                        if (checkCount >= 2) {
                             clearInterval(checkInterval);
                             
                             // Verificar una última vez si el video se cargó
@@ -402,8 +414,9 @@
                             // Verificar si realmente hay un error persistente
                             const error = videoPlayer.error;
                             if (!error) {
-                                // No hay error real, el video puede estar cargando todavía
-                                console.log('No hay error real, el video puede estar cargando todavía');
+                                // No hay error real, el video puede estar cargando todavía - dar más tiempo
+                                console.log('No hay error real, el video puede estar cargando todavía. Esperando más...');
+                                // Continuar esperando sin mostrar error
                                 return;
                             }
                             
@@ -417,14 +430,20 @@
                                         onVideoLoaded();
                                     }
                                 }).catch(() => {
-                                    // Si no se puede reproducir, mostrar el error
-                                    showActualError(error);
+                                    // Si no se puede reproducir, esperar más antes de mostrar error
+                                    console.log('No se pudo reproducir, pero esperando más tiempo...');
                                 });
                                 return;
                             }
                             
-                            // Solo mostrar error si realmente no se puede cargar
-                            showActualError(error);
+                            // Si no carga después de 2 segundos, cargar en iframe
+                            setTimeout(() => {
+                                if (!hasLoaded && videoPlayer.readyState < 2) {
+                                    console.log('Error persistente después de espera, cargando en iframe');
+                                    loadUrlInIframe(videoUrl);
+                                    resolve();
+                                }
+                            }, 2000);
                         }
                     }, 1000); // Verificar cada segundo
                     
@@ -479,31 +498,34 @@
                     
                     // Si el video tiene metadatos y buffer, aún puede estar cargando
                     if (finalReadyState >= 1 && finalBuffered > 0 && !hasLoaded && !hasErrored) {
-                        console.log('Video tiene progreso al final del timeout, dándole más tiempo - readyState:', finalReadyState, 'buffer:', finalBuffered);
-                        // Dar 5 segundos más si hay progreso
+                        console.log('Video tiene progreso, esperando un poco más - readyState:', finalReadyState, 'buffer:', finalBuffered);
+                        // Dar 1 segundo más si hay progreso
                         setTimeout(() => {
                             if (!hasLoaded && !hasErrored && videoPlayer.readyState >= 1) {
-                                console.log('Video cargado después de extensión del timeout');
+                                console.log('Video cargado');
                                 onVideoLoaded();
                             } else if (!hasLoaded && !hasErrored) {
-                                showTimeoutError();
+                                // Aún no cargó, cargar en iframe
+                                console.log('Video no cargó a tiempo, cargando en iframe');
+                                loadUrlInIframe(videoUrl);
+                                resolve();
                             }
-                        }, 5000);
+                        }, 1000); // 1 segundo más
                         return;
                     }
                     
+                    // Si no hay progreso después del timeout, cargar en iframe
                     if (!hasLoaded && !hasErrored) {
-                        showTimeoutError();
+                        console.log('Timeout alcanzado sin progreso, cargando en iframe');
+                        loadUrlInIframe(videoUrl);
+                        resolve();
                     }
                     
                     function showTimeoutError() {
-                        hasErrored = true;
-                        videoPlayer.pause();
-                        videoPlayer.src = '';
-                        if (placeholder) placeholder.style.display = 'flex';
-                        if (placeholderText) placeholderText.textContent = 'Tiempo de espera agotado';
-                        showError('Tiempo de espera agotado. El video puede requerir autenticación o no estar disponible.');
-                        reject(new Error('Timeout'));
+                        // En lugar de mostrar error, intentar cargar en iframe
+                        console.log('Timeout alcanzado, cargando en iframe como respaldo');
+                        loadUrlInIframe(videoUrl);
+                        resolve(); // Resolver para no mostrar error
                     }
                 }, timeoutDuration);
 
@@ -626,6 +648,30 @@
             const iframe = document.getElementById('googleDriveFrame');
             if (iframe) {
                 iframe.src = embedUrl;
+                iframe.style.display = 'block';
+            }
+        }
+
+        // Función genérica para cargar cualquier URL en iframe (para URLs raras o que no se reconocen)
+        function loadUrlInIframe(url) {
+            // Ocultar el video player y mostrar el iframe
+            const languageSelector = document.getElementById('languageSelector');
+            
+            if (videoPlayer) {
+                videoPlayer.style.display = 'none';
+            }
+            if (placeholder) {
+                placeholder.style.display = 'none';
+            }
+            
+            // Ocultar selector de idioma
+            if (languageSelector) {
+                languageSelector.style.display = 'none';
+            }
+            
+            const iframe = document.getElementById('googleDriveFrame');
+            if (iframe) {
+                iframe.src = url;
                 iframe.style.display = 'block';
             }
         }
